@@ -1,12 +1,14 @@
 @font-face {
     font-family: "ProximaNova";
+    font-display: fallback;
     src: url("/fonts/ProximaNova-Regular.woff") format('woff');
 }
 
 @font-face {
     font-family: "ProximaNova";
-    src: url("/fonts/ProximaNova-Bold.woff") format('woff');
+    font-display: fallback;
     font-weight: bold;
+    src: url("/fonts/ProximaNova-Bold.woff") format('woff');
 }
 
 :root {
