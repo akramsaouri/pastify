@@ -8,10 +8,11 @@ import "./styles.css";
 import Illustration from "./icons/Illustration";
 import Spinner from "./icons/Spinner";
 
-// TODO: add animation
+// TODO: fix textarea responsive
+// TODO: add transitions
 // TODO: handle duplicate tracks
 // TODO: appropriate default image for playlist
-// TODO: add summary
+// TODO: add op summary
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -98,10 +99,10 @@ function App() {
       <div className="wrapper">
         <div className="left">
           <h1 className="title">
-            <span>Pastify:</span> easier way to create playlists.
+            <span>Pastify:</span> quick way to create playlists.
           </h1>
           <p className="description">
-            Tool to quickly create spotify playlists with a list of songs.
+            Just paste your list of tracks below and we will do the rest.
           </p>
           {!loggedIn && (
             <SpotifyLogin
