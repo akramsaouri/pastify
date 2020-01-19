@@ -7,12 +7,8 @@ import * as Spotify from "./Spotify";
 import "./styles.css";
 import Illustration from "./icons/Illustration";
 import Spinner from "./icons/Spinner";
-
-// TODO: fix textarea responsive
-// TODO: add transitions
-// TODO: handle duplicate tracks
-// TODO: appropriate default image for playlist
-// TODO: add op summary
+import Check from './icons/Check'
+import Alert from './icons/Alert'
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -24,6 +20,8 @@ function App() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
+  const [removeDups, setRemoveDups] = useState(true);
+  const [error, setError] = useState('');
   const summaryDivRef = useRef(null);
   const usernameRef = useRef(null);
 
@@ -39,10 +37,16 @@ function App() {
   };
 
   const onSubmit = async () => {
+    setError('')
     setLoading(true);
     try {
       const tracks = await Spotify.bulkSearch(lines);
-      const uris = tracks.map(t => t.uri);
+      let uris = tracks.map(t => t.uri);
+      if (removeDups && selectedPlaylist.id !== 'new') {
+        // remove duplicate tracks
+        const playlistTracks = await Spotify.fetchPlaylistTracks(selectedPlaylist.id)
+        uris = uris.filter(uri => !playlistTracks.includes(uri))
+      }
       if (selectedPlaylist.id === "new") {
         const newPlaylistID = await Spotify.createPlaylist(
           selectedPlaylist.name,
@@ -62,6 +66,7 @@ function App() {
       setPlaylists(await Spotify.fetchPlaylists(usernameRef.current));
     } catch (e) {
       console.log(e);
+      setError('Something went wrong, please try again (or not).')
     } finally {
       setLoading(false);
     }
@@ -71,9 +76,16 @@ function App() {
     const token = localStorage.getItem(Spotify.key);
     if (token) {
       setLoggedIn(true);
-      const username = await Spotify.fetchUsername();
-      usernameRef.current = username;
-      setPlaylists(await Spotify.fetchPlaylists(username));
+      try {
+        const username = await Spotify.fetchUsername();
+        usernameRef.current = username;
+        setPlaylists(await Spotify.fetchPlaylists(username));
+      } catch (e) {
+        console.log(e)
+        if (e.message === 'TOKEN_EXPIRED') {
+          setLoggedIn(false)
+        }
+      }
     }
   }
   React.useEffect(() => {
@@ -134,6 +146,13 @@ function App() {
                 }}
                 onChange={onTextAreaChange}
               />
+              <label htmlFor='checkbox' className='checkbox'>
+                <input style={{ display: 'none' }} id='checkbox' type='checkbox' checked={removeDups} onChange={(e) => setRemoveDups(e.target.checked)} />
+                <div>
+                  <Check checked={removeDups} />
+                  <span>Remove duplicates</span>
+                </div>
+              </label>
             </div>
             <div className="playlists">
               {fetching ? (
@@ -141,17 +160,17 @@ function App() {
                   Fetching your <span>public</span> playlists...
                 </h3>
               ) : (
-                <h3 className="subtitle">
-                  Pick a playlist or{" "}
-                  <span
-                    style={{ cursor: "pointer" }}
-                    onClick={() => setShowForm(!showForm)}
-                  >
-                    create
+                  <h3 className="subtitle">
+                    Pick a playlist or{" "}
+                    <span
+                      style={{ cursor: "pointer" }}
+                      onClick={() => setShowForm(!showForm)}
+                    >
+                      create
                   </span>{" "}
-                  a new one
+                    a new one
                 </h3>
-              )}
+                )}
               {showForm && (
                 <input
                   value={name}
@@ -172,34 +191,34 @@ function App() {
               {fetching ? (
                 <Spinner />
               ) : (
-                transitions.map(({ item: playlist, props, key }) => {
-                  let classes = "playlist";
-                  if (selectedPlaylist.id === playlist.id) {
-                    classes += " playlist--selected";
-                  }
-                  return (
-                    <animated.div
-                      key={key}
-                      className={classes}
-                      style={props}
-                      onClick={() => {
-                        setSelectedPlaylist(playlist);
-                        setShowForm(false);
-                      }}
-                    >
-                      <div className="playlist-img">
-                        <img src={playlist.img} alt={playlist.name} />
-                      </div>
-                      <div className="playlist-details">
-                        <span className="playlist-title">{playlist.name}</span>
-                        <span className="playlist-total">
-                          <span>{playlist.total}</span> tracks currently
+                  transitions.map(({ item: playlist, props, key }) => {
+                    let classes = "playlist";
+                    if (selectedPlaylist.id === playlist.id) {
+                      classes += " playlist--selected";
+                    }
+                    return (
+                      <animated.div
+                        key={key}
+                        className={classes}
+                        style={props}
+                        onClick={() => {
+                          setSelectedPlaylist(playlist);
+                          setShowForm(false);
+                        }}
+                      >
+                        <div className="playlist-img">
+                          <img src={playlist.img} alt={playlist.name} />
+                        </div>
+                        <div className="playlist-details">
+                          <span className="playlist-title">{playlist.name}</span>
+                          <span className="playlist-total">
+                            <span>{playlist.total}</span> tracks currently
                         </span>
-                      </div>
-                    </animated.div>
-                  );
-                })
-              )}
+                        </div>
+                      </animated.div>
+                    );
+                  })
+                )}
             </div>
           </div>
           <div className="wrapper">
@@ -220,9 +239,17 @@ function App() {
                       <Spinner /> <span>Hold on...</span>
                     </>
                   ) : (
-                    "Yes, do your job."
-                  )}
+                      "Yes, do your job."
+                    )}
                 </button>
+                {error && (
+                  <p className="error-text">
+                    <Alert />
+                    <span>
+                      {error}
+                    </span>
+                  </p>
+                )}
               </div>
             )}
           </div>

@@ -5,10 +5,10 @@ const headers = () => ({
 
 const toJson = res => {
   if (res.status === 401) {
-    // token no more valid
     localStorage.removeItem(key);
-  } else {
-    return res.json();
+    throw new Error('TOKEN_EXPIRED')
+  } else  {
+    return res.json()
   }
 };
 
@@ -26,7 +26,7 @@ export const fetchPlaylists = async username => {
   return items
     .filter(({ owner }) => owner.id === username)
     .map(({ name, id, images, tracks: { total } }) => {
-      let img = "https://picsum.photos/60";
+      let img = "/music.svg";
       if (images.length > 0) {
         const image = images.find(x => x.width === 60 || x.width === null);
         if (image) {
@@ -56,8 +56,7 @@ export const createPlaylist = async (playlistName, username) => {
 };
 
 export const addTracksToPlaylist = (playlistID, uris) => {
-  uris = uris = uris.join(",");
-  const url = `https://api.spotify.com/v1/playlists/${playlistID}/tracks?uris=${uris}`;
+  const url = `https://api.spotify.com/v1/playlists/${playlistID}/tracks?uris=${uris.join(",")}`;
   return fetch(url, {
     method: "POST",
     headers: headers()
@@ -84,3 +83,10 @@ export const bulkSearch = async lines => {
     arr.filter(x => x !== null)
   );
 };
+
+
+export const fetchPlaylistTracks = async playlistID => {
+  const url = `https://api.spotify.com/v1/playlists/${playlistID}/tracks`
+  const { items } = await fetch(url, {headers: headers()}).then(toJson)
+  return items.map(item => item.track.uri)
+}
