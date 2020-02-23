@@ -1,6 +1,6 @@
 import React from "react";
 
-function Icon() {
+function Illustration() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 559 508">
       <g
@@ -91,4 +91,4 @@ function Icon() {
   );
 }
 
-export default Icon;
+export default Illustration;

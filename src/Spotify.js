@@ -79,9 +79,7 @@ export const bulkSearch = async lines => {
     }
     return null;
   };
-  return Promise.all(lines.map(searchLine)).then(arr =>
-    arr.filter(x => x !== null)
-  );
+  return Promise.all(lines.map(searchLine))
 };
 
 

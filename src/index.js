@@ -1,13 +1,14 @@
 import React, { useState, useRef } from "react";
 import ReactDOM from "react-dom";
 import SpotifyLogin from "react-spotify-login";
-import { useTransition, animated } from "react-spring";
+import { useTransition, animated} from "react-spring";
 
 import * as Spotify from "./Spotify";
 import "./styles.css";
 import Illustration from "./icons/Illustration";
 import Spinner from "./icons/Spinner";
 import Check from './icons/Check'
+import Info from './icons/Info'
 import Alert from './icons/Alert'
 
 function App() {
@@ -21,7 +22,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [removeDups, setRemoveDups] = useState(true);
-  const [error, setError] = useState('');
+  const [message, setMessage] = useState({});
   const summaryDivRef = useRef(null);
   const usernameRef = useRef(null);
 
@@ -32,20 +33,33 @@ function App() {
   };
 
   const onTextAreaChange = ({ target: { value } }) => {
+    setMessage({})
     setValue(value);
     setLines(!!value ? value.split("\n").filter(x => !!x) : []);
   };
 
+  const onPlaylistSelect = (playlist) => {
+    setMessage({})
+    setSelectedPlaylist(playlist);
+    setShowForm(false);
+  }
+
   const onSubmit = async () => {
-    setError('')
+    setMessage({})
     setLoading(true);
     try {
       const tracks = await Spotify.bulkSearch(lines);
-      let uris = tracks.map(t => t.uri);
+      let uris = tracks.filter(x => x !== null).map(t => t.uri);
       if (removeDups && selectedPlaylist.id !== 'new') {
         // remove duplicate tracks
         const playlistTracks = await Spotify.fetchPlaylistTracks(selectedPlaylist.id)
         uris = uris.filter(uri => !playlistTracks.includes(uri))
+      }
+      if (uris.length === 0) {
+        return setMessage({
+          content: 'No tracks were added to the selected playlist.',
+          type: 'error'
+        })
       }
       if (selectedPlaylist.id === "new") {
         const newPlaylistID = await Spotify.createPlaylist(
@@ -62,11 +76,18 @@ function App() {
       setValue("");
       setName("");
       setShowForm(false);
+      setMessage({
+        content: (
+          <>
+            <span>{uris.length}</span> tracks (out of <span>{tracks.length}</span> lines) were added to <span>"{selectedPlaylist.name}"</span>.
+        </>),
+        type: 'info'
+      })
       // refresh playlists count
       setPlaylists(await Spotify.fetchPlaylists(usernameRef.current));
     } catch (e) {
       console.log(e);
-      setError('Something went wrong, please try again (or not).')
+      setMessage({ content: 'Something went wrong, please try again (or not).', type: 'error' })
     } finally {
       setLoading(false);
     }
@@ -100,6 +121,12 @@ function App() {
     }
   }, [selectedPlaylist.id, lines.length]);
 
+  const messageProps = useTransition(message.content, null, {
+    from: { position: 'absolute', opacity: 0 },
+    enter: { opacity: 1 },
+    leave: { opacity: 0 },
+  })
+
   const transitions = useTransition(playlists, playlist => playlist.id, {
     from: { transform: "translate3d(80px,0,0)" },
     enter: { transform: "translate3d(0,0px,0)" },
@@ -122,7 +149,7 @@ function App() {
               redirectUri={process.env.REACT_APP_SPOTIFY_REDIRECT_URI}
               scope="playlist-modify-public"
               onSuccess={onSpotifySuccess}
-              onFailure={console.log}
+              onFailure={console.log} // TODO: handle this
               className="button"
             />
           )}
@@ -191,67 +218,68 @@ function App() {
               {fetching ? (
                 <Spinner />
               ) : (
-                  transitions.map(({ item: playlist, props, key }) => {
-                    let classes = "playlist";
-                    if (selectedPlaylist.id === playlist.id) {
-                      classes += " playlist--selected";
-                    }
-                    return (
-                      <animated.div
-                        key={key}
-                        className={classes}
-                        style={props}
-                        onClick={() => {
-                          setSelectedPlaylist(playlist);
-                          setShowForm(false);
-                        }}
-                      >
-                        <div className="playlist-img">
-                          <img src={playlist.img} alt={playlist.name} />
-                        </div>
-                        <div className="playlist-details">
-                          <span className="playlist-title">{playlist.name}</span>
-                          <span className="playlist-total">
-                            <span>{playlist.total}</span> tracks currently
-                        </span>
-                        </div>
-                      </animated.div>
-                    );
-                  })
+                  <div className='playlists-wrapper'>
+                    {transitions.map(({ item: playlist, props, key }) => {
+                      let classes = "playlist";
+                      if (selectedPlaylist.id === playlist.id) {
+                        classes += " playlist--selected";
+                      }
+                      return (
+                        <animated.div
+                          key={key}
+                          className={classes}
+                          style={props}
+                          onClick={() => onPlaylistSelect(playlist)}
+                        >
+                          <div className="playlist-img">
+                            <img src={playlist.img} alt={playlist.name} />
+                          </div>
+                          <div className="playlist-details">
+                            <span className="playlist-title">{playlist.name}</span>
+                            <span className="playlist-total">
+                              <span>{playlist.total}</span> tracks currently
+                            </span>
+                          </div>
+                        </animated.div>
+                      );
+                    })}
+                  </div>
                 )}
             </div>
           </div>
           <div className="wrapper">
-            {lines.length > 0 && selectedPlaylist.id && (
-              <div className="summary-wrapper" ref={summaryDivRef}>
-                <p className="summary-text">
-                  You want to add <span>{lines.length}</span> songs to the
+            <div className="summary-wrapper" ref={summaryDivRef}>
+              {lines.length > 0 && selectedPlaylist.id && (
+                <>
+                  <p className="summary-text">
+                    You want to add <span>{lines.length}</span> songs to the
                   playlist <span>{selectedPlaylist.name}</span> ?
                 </p>
-                <button
-                  className="button"
-                  disabled={loading}
-                  style={loading ? { filter: "opacity(0.7)" } : {}}
-                  onClick={onSubmit}
-                >
-                  {loading ? (
-                    <>
-                      <Spinner /> <span>Hold on...</span>
-                    </>
-                  ) : (
-                      "Yes, do your job."
-                    )}
-                </button>
-                {error && (
-                  <p className="error-text">
-                    <Alert />
-                    <span>
-                      {error}
-                    </span>
-                  </p>
-                )}
-              </div>
-            )}
+                  <button
+                    className="button"
+                    disabled={loading}
+                    style={loading ? { filter: "opacity(0.7)" } : {}}
+                    onClick={onSubmit}
+                  >
+                    {loading ? (
+                      <>
+                        <Spinner /> <span>Hold on...</span>
+                      </>
+                    ) : (
+                        "Yes, do your job."
+                      )}
+                  </button>
+                </>
+              )}
+              {messageProps.map(({ item, key, props }) => item && (
+                <animated.p key={key} style={props} className='message-text'>
+                  {message.type === 'error' ? <Alert /> : <Info />}
+                  <span className={message.type === 'error' ? "error-text" : 'info-text'}>
+                    {message.content}
+                  </span>
+                </animated.p>
+              ))}
+            </div>
           </div>
         </>
       )}
