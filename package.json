@@ -7,9 +7,10 @@
   "dependencies": {
     "react": "16.12.0",
     "react-dom": "16.12.0",
-    "react-scripts": "3.0.1",
+    "react-scripts": "^3.4.1",
     "react-spotify-login": "0.9.1",
-    "react-spring": "8.0.27"
+    "react-spring": "8.0.27",
+    "spotify-auto-paging": "0.0.2"
   },
   "devDependencies": {
     "typescript": "3.3.3"
@@ -25,5 +26,10 @@
     "not dead",
     "not ie <= 11",
     "not op_mini all"
-  ]
+  ],
+  "prettier": {
+    "singleQuote": true,
+    "bracketSpacing": true,
+    "semi": false
+  }
 }
