@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import ReactDOM from 'react-dom'
 import SpotifyLogin from 'react-spotify-login'
 import { useTransition, animated } from 'react-spring'
+import { useDebounce } from 'use-debounce'
 
 import * as Spotify from './api'
 import './styles.css'
@@ -23,6 +24,13 @@ function App() {
   const [fetching, setFetching] = useState(false)
   const [removeDups, setRemoveDups] = useState(true)
   const [message, setMessage] = useState({})
+  const [artistsSuggestion, setArtistsSuggestion] = useState([])
+  const [selectedArtist, setSelectedArtist] = useState(null)
+  const [selectedArtistInput, setSelectedArtistInput] = useState('')
+  const [artistsSuggestionLoading, setArtistsSuggestionLoading] = useState(
+    false
+  )
+  const [debouncedArtistInput] = useDebounce(selectedArtistInput, 300)
   const summaryDivRef = useRef(null)
   const usernameRef = useRef(null)
 
@@ -44,11 +52,35 @@ function App() {
     setShowForm(false)
   }
 
-  const onSubmit = async () => {
+  const handleArtistSelect = (artist) => {
+    setSelectedArtistInput(artist.name)
+    setSelectedArtist(artist.name)
+    setArtistsSuggestion([])
+  }
+
+  const handleArtistChange = (value) => {
+    setSelectedArtistInput(value)
+    if (!value) {
+      return setArtistsSuggestion([])
+    }
+  }
+
+  useEffect(() => {
+    if (!!debouncedArtistInput && debouncedArtistInput !== selectedArtist) {
+      setArtistsSuggestionLoading(true)
+      Spotify.searchArtists(debouncedArtistInput).then((artists) => {
+        setArtistsSuggestionLoading(false)
+        setArtistsSuggestion(artists)
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedArtistInput])
+
+  const handleSubmit = async () => {
     setMessage({})
     setLoading(true)
     try {
-      const tracks = await Spotify.bulkSearch(lines)
+      const tracks = await Spotify.bulkSearch(lines, selectedArtist)
       let uris = tracks.filter((x) => x !== null).map((t) => t.uri)
       if (removeDups && selectedPlaylist.id !== 'new') {
         // remove duplicate tracks
@@ -77,6 +109,9 @@ function App() {
       setSelectedPlaylist({})
       setValue('')
       setName('')
+      setArtistsSuggestion([])
+      setSelectedArtist('')
+      setSelectedArtistInput('')
       setShowForm(false)
       setMessage({
         content: (
@@ -120,7 +155,9 @@ function App() {
 
   useEffect(() => {
     setFetching(true)
-    fetchPlaylists().then(() => setFetching(false))
+    fetchPlaylists()
+      .then(() => setFetching(false))
+      .catch((e) => console.log(e))
   }, [])
 
   useEffect(() => {
@@ -182,19 +219,59 @@ function App() {
                 }}
                 onChange={onTextAreaChange}
               />
-              <label htmlFor="checkbox" className="checkbox">
-                <input
-                  style={{ display: 'none' }}
-                  id="checkbox"
-                  type="checkbox"
-                  checked={removeDups}
-                  onChange={(e) => setRemoveDups(e.target.checked)}
-                />
-                <div>
-                  <Check checked={removeDups} />
-                  <span>Remove duplicates</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <label
+                  htmlFor="checkbox"
+                  className="checkbox"
+                  style={{ flex: 1 }}
+                >
+                  <input
+                    style={{ display: 'none' }}
+                    id="checkbox"
+                    type="checkbox"
+                    checked={removeDups}
+                    onChange={(e) => setRemoveDups(e.target.checked)}
+                  />
+                  <div>
+                    <Check checked={removeDups} />
+                    <span>Remove duplicates</span>
+                  </div>
+                </label>
+                <div style={{ flex: 1 }}>
+                  <input
+                    value={selectedArtistInput}
+                    id="artist"
+                    className="input artist-input"
+                    placeholder="Search by artist name"
+                    onChange={(e) => handleArtistChange(e.target.value)}
+                  />
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <label htmlFor="artist" className="artist-label">
+                      Artist prefix (optional)
+                    </label>
+                    {artistsSuggestionLoading && <Spinner />}
+                  </div>
+                  {artistsSuggestion.length > 0 && (
+                    <ul className="suggestion-list">
+                      {artistsSuggestion.map((artist) => (
+                        <li
+                          key={artist.id}
+                          className="suggestion-item"
+                          onClick={() => handleArtistSelect(artist)}
+                        >
+                          {artist.name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-              </label>
+              </div>
             </div>
             <div className="playlists">
               {fetching ? (
@@ -228,6 +305,7 @@ function App() {
                   required
                   placeholder="Give it a name first"
                   className="input"
+                  autoFocus
                 />
               )}
               {fetching ? (
@@ -269,14 +347,21 @@ function App() {
               {lines.length > 0 && selectedPlaylist.id && (
                 <>
                   <p className="summary-text">
-                    You want to add <span>{lines.length}</span> songs to the
-                    playlist <span>{selectedPlaylist.name}</span> ?
+                    You want to add <span>{lines.length}</span> songs{' '}
+                    {selectedArtist ? (
+                      <>
+                        by <span>{selectedArtist}</span>{' '}
+                      </>
+                    ) : (
+                      ''
+                    )}
+                    to the playlist <span>{selectedPlaylist.name}</span> ?
                   </p>
                   <button
                     className="button"
                     disabled={loading}
                     style={loading ? { filter: 'opacity(0.7)' } : {}}
-                    onClick={onSubmit}
+                    onClick={handleSubmit}
                   >
                     {loading ? (
                       <>
