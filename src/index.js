@@ -8,8 +8,8 @@ import * as Spotify from './api'
 import {
   artistInitialState,
   artistReducer,
-  playlistReducer,
-  playlistInitialState,
+  appInitialState,
+  appReducer,
 } from './reducers'
 import './styles.css'
 import Illustration from './icons/Illustration'
@@ -19,68 +19,67 @@ import Info from './icons/Info'
 import Alert from './icons/Alert'
 
 function App() {
-  const [artistState, artistDispatch] = useReducer(
+  const [artistState, dispatchArtist] = useReducer(
     artistReducer,
     artistInitialState
   )
-  const [loggedIn, setLoggedIn] = useState(false)
+  const [appState, dispatchApp] = useReducer(appReducer, appInitialState)
+  const setAppState = (payload) => dispatchApp({ type: 'setAppState', payload })
+
   const [value, setValue] = useState('')
   const [lines, setLines] = useState([])
 
+  const [fetching, setFetching] = useState(false)
   const [playlists, setPlaylists] = useState([])
   const [selectedPlaylist, setSelectedPlaylist] = useState({})
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [fetching, setFetching] = useState(false)
+
   const [removeDups, setRemoveDups] = useState(true)
-  const [message, setMessage] = useState({})
+
   const [debouncedArtistInput] = useDebounce(artistState.input, 300)
   const summaryDivRef = useRef(null)
   const usernameRef = useRef(null)
 
   const onSpotifySuccess = ({ access_token }) => {
     localStorage.setItem(Spotify.key, access_token)
-    setLoggedIn(true)
+    setAppState({ status: 'idle' })
     fetchPlaylists()
   }
 
   const onTextAreaChange = ({ target: { value } }) => {
-    setMessage({})
     setValue(value)
     setLines(!!value ? value.split('\n').filter((x) => !!x) : [])
   }
 
   const onPlaylistSelect = (playlist) => {
-    setMessage({})
     setSelectedPlaylist(playlist)
     setShowForm(false)
   }
 
   const handleArtistSelect = (artist) => {
-    artistDispatch({
+    dispatchArtist({
       type: 'selectArtist',
       payload: artist,
     })
   }
 
   const handleArtistInputChange = ({ target: { value } }) => {
-    artistDispatch({ type: 'changeArtistInput', payload: value })
+    dispatchArtist({ type: 'changeArtistInput', payload: value })
   }
 
   useEffect(() => {
     if (!debouncedArtistInput) return
     if (artistState.selected?.name === debouncedArtistInput) return
-    artistDispatch({ type: 'searchArtistStart' })
+    dispatchArtist({ type: 'searchArtistStart' })
     Spotify.searchArtists(debouncedArtistInput).then((artists) => {
-      artistDispatch({ type: 'searchArtistEnd', payload: artists })
+      dispatchArtist({ type: 'searchArtistEnd', payload: artists })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedArtistInput])
 
   const handleSubmit = async () => {
-    setMessage({})
-    setLoading(true)
+    setAppState({ status: 'submitting' })
     try {
       const tracks = await Spotify.bulkSearch(lines, artistState.selected)
       let uris = tracks.filter((x) => x !== null).map((t) => t.uri)
@@ -92,9 +91,9 @@ function App() {
         uris = uris.filter((uri) => !playlistTracks.includes(uri))
       }
       if (uris.length === 0) {
-        return setMessage({
-          content: 'No tracks were added to the selected playlist.',
-          type: 'error',
+        return setAppState({
+          message: 'No tracks were added to the selected playlist.',
+          status: 'error',
         })
       }
       if (selectedPlaylist.id === 'new') {
@@ -112,42 +111,41 @@ function App() {
       setValue('')
       setName('')
       setShowForm(false)
-      artistDispatch({ type: 'reset' })
-      setMessage({
-        content: (
+      dispatchArtist({ type: 'reset' })
+      setAppState({
+        message: (
           <>
             <span>{uris.length}</span> tracks (out of{' '}
             <span>{tracks.length}</span> lines) were added to{' '}
             <span>"{selectedPlaylist.name}"</span>.
           </>
         ),
-        type: 'info',
+        status: 'success',
       })
       // refresh playlists count
       setPlaylists(await Spotify.fetchPlaylists(usernameRef.current))
     } catch (e) {
       console.log(e)
-      setMessage({
-        content: 'Something went wrong, please try again (or not).',
-        type: 'error',
+      setAppState({
+        message: 'Something went wrong, please try again (or not).',
+        status: 'error',
       })
-    } finally {
-      setLoading(false)
     }
   }
 
   async function fetchPlaylists() {
     const token = localStorage.getItem(Spotify.key)
     if (token) {
-      setLoggedIn(true)
+      setAppState({ status: 'idle' })
       try {
         const username = await Spotify.fetchUsername()
         usernameRef.current = username
-        setPlaylists(await Spotify.fetchPlaylists(username))
+        const playlists = await Spotify.fetchPlaylists(username)
+        setPlaylists(playlists)
       } catch (e) {
         console.log(e)
         if (e.message === 'TOKEN_EXPIRED') {
-          setLoggedIn(false)
+          setAppState({ status: 'loggedOut' })
         }
       }
     }
@@ -167,7 +165,7 @@ function App() {
     }
   }, [selectedPlaylist.id, lines.length])
 
-  const messageProps = useTransition(message.content, null, {
+  const messageProps = useTransition(appState, null, {
     from: { position: 'absolute', opacity: 0 },
     enter: { opacity: 1 },
     leave: { opacity: 0 },
@@ -179,6 +177,7 @@ function App() {
     leave: { transform: 'translate3d(80px,0,0)' },
   })
 
+  console.log({ appState })
   return (
     <>
       <div className="wrapper">
@@ -189,7 +188,7 @@ function App() {
           <p className="description">
             Just paste your list of tracks below and we will do the rest.
           </p>
-          {!loggedIn && (
+          {appState.status === 'loggedOut' && (
             <SpotifyLogin
               clientId={process.env.REACT_APP_SPOTIFY_CLIENT_ID}
               redirectUri={process.env.REACT_APP_SPOTIFY_REDIRECT_URI}
@@ -204,7 +203,7 @@ function App() {
           <Illustration />
         </div>
       </div>
-      {loggedIn && (
+      {appState.status !== 'loggedOut' && (
         <>
           <div className="wrapper">
             <div className="textarea">
@@ -359,11 +358,15 @@ function App() {
                   </p>
                   <button
                     className="button"
-                    disabled={loading}
-                    style={loading ? { filter: 'opacity(0.7)' } : {}}
+                    disabled={appState.status === 'submitting'}
+                    style={
+                      appState.status === 'submitting'
+                        ? { filter: 'opacity(0.7)' }
+                        : {}
+                    }
                     onClick={handleSubmit}
                   >
-                    {loading ? (
+                    {appState.status === 'submitting' ? (
                       <>
                         <Spinner /> <span>Hold on...</span>
                       </>
@@ -373,24 +376,18 @@ function App() {
                   </button>
                 </>
               )}
-              {messageProps.map(
-                ({ item, key, props }) =>
-                  item && (
-                    <animated.p
-                      key={key}
-                      style={props}
-                      className="message-text"
-                    >
-                      {message.type === 'error' ? <Alert /> : <Info />}
-                      <span
-                        className={
-                          message.type === 'error' ? 'error-text' : 'info-text'
-                        }
-                      >
-                        {message.content}
-                      </span>
-                    </animated.p>
-                  )
+              {(appState.status === 'error' ||
+                appState.status === 'success') && (
+                <p className="message-text">
+                  {appState.status === 'error' ? <Alert /> : <Info />}
+                  <span
+                    className={
+                      appState.status === 'error' ? 'error-text' : 'info-text'
+                    }
+                  >
+                    {appState.message}
+                  </span>
+                </p>
               )}
             </div>
           </div>

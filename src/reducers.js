@@ -34,6 +34,31 @@ export function artistReducer(state, action) {
     case 'reset':
       return artistInitialState
     default:
-      throw new Error('Invalid action given to artistReducer.')
+      throw new Error(
+        `Invalid action.type: "${action.type}" was provided to artistReducer.`
+      )
+  }
+}
+
+export const appInitialState = {
+  status: 'idle',
+}
+
+export function appReducer(state, action) {
+  const allowedStatus = ['loggedOut', 'idle', 'submitting', 'success', 'error']
+  switch (action.type) {
+    case 'setAppState':
+      const { status, message } = action.payload
+      if (allowedStatus.includes(status)) {
+        return { status, message }
+      } else {
+        throw new Error(
+          `Invalid status: "${status}" was provided to setAppState.`
+        )
+      }
+    default:
+      throw new Error(
+        `Invalid action.type: "${action.type}" was provided to appState.`
+      )
   }
 }
