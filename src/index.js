@@ -1,10 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useReducer } from 'react'
 import ReactDOM from 'react-dom'
 import SpotifyLogin from 'react-spotify-login'
 import { useTransition, animated } from 'react-spring'
 import { useDebounce } from 'use-debounce'
 
 import * as Spotify from './api'
+import {
+  artistInitialState,
+  artistReducer,
+  playlistReducer,
+  playlistInitialState,
+} from './reducers'
 import './styles.css'
 import Illustration from './icons/Illustration'
 import Spinner from './icons/Spinner'
@@ -13,9 +19,18 @@ import Info from './icons/Info'
 import Alert from './icons/Alert'
 
 function App() {
+  const [artistState, artistDispatch] = useReducer(
+    artistReducer,
+    artistInitialState
+  )
+  const [playlistState, playlistDispatch] = useReducer(
+    playlistReducer,
+    playlistInitialState
+  )
   const [loggedIn, setLoggedIn] = useState(false)
   const [value, setValue] = useState('')
   const [lines, setLines] = useState([])
+
   const [playlists, setPlaylists] = useState([])
   const [selectedPlaylist, setSelectedPlaylist] = useState({})
   const [showForm, setShowForm] = useState(false)
@@ -24,13 +39,7 @@ function App() {
   const [fetching, setFetching] = useState(false)
   const [removeDups, setRemoveDups] = useState(true)
   const [message, setMessage] = useState({})
-  const [artistsSuggestion, setArtistsSuggestion] = useState([])
-  const [selectedArtist, setSelectedArtist] = useState(null)
-  const [selectedArtistInput, setSelectedArtistInput] = useState('')
-  const [artistsSuggestionLoading, setArtistsSuggestionLoading] = useState(
-    false
-  )
-  const [debouncedArtistInput] = useDebounce(selectedArtistInput, 300)
+  const [debouncedArtistInput] = useDebounce(artistState.input, 300)
   const summaryDivRef = useRef(null)
   const usernameRef = useRef(null)
 
@@ -53,26 +62,23 @@ function App() {
   }
 
   const handleArtistSelect = (artist) => {
-    setSelectedArtistInput(artist.name)
-    setSelectedArtist(artist.name)
-    setArtistsSuggestion([])
+    artistDispatch({
+      type: 'selectArtist',
+      payload: artist,
+    })
   }
 
-  const handleArtistChange = (value) => {
-    setSelectedArtistInput(value)
-    if (!value) {
-      return setArtistsSuggestion([])
-    }
+  const handleArtistInputChange = ({ target: { value } }) => {
+    artistDispatch({ type: 'changeArtistInput', payload: value })
   }
 
   useEffect(() => {
-    if (!!debouncedArtistInput && debouncedArtistInput !== selectedArtist) {
-      setArtistsSuggestionLoading(true)
-      Spotify.searchArtists(debouncedArtistInput).then((artists) => {
-        setArtistsSuggestionLoading(false)
-        setArtistsSuggestion(artists)
-      })
-    }
+    if (!debouncedArtistInput) return
+    if (artistState.selected?.name === debouncedArtistInput) return
+    artistDispatch({ type: 'searchArtistStart' })
+    Spotify.searchArtists(debouncedArtistInput).then((artists) => {
+      artistDispatch({ type: 'searchArtistEnd', payload: artists })
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedArtistInput])
 
@@ -80,7 +86,7 @@ function App() {
     setMessage({})
     setLoading(true)
     try {
-      const tracks = await Spotify.bulkSearch(lines, selectedArtist)
+      const tracks = await Spotify.bulkSearch(lines, artistState.selected)
       let uris = tracks.filter((x) => x !== null).map((t) => t.uri)
       if (removeDups && selectedPlaylist.id !== 'new') {
         // remove duplicate tracks
@@ -109,10 +115,8 @@ function App() {
       setSelectedPlaylist({})
       setValue('')
       setName('')
-      setArtistsSuggestion([])
-      setSelectedArtist('')
-      setSelectedArtistInput('')
       setShowForm(false)
+      artistDispatch({ type: 'reset' })
       setMessage({
         content: (
           <>
@@ -239,11 +243,11 @@ function App() {
                 </label>
                 <div style={{ flex: 1 }}>
                   <input
-                    value={selectedArtistInput}
+                    value={artistState.input}
                     id="artist"
                     className="input artist-input"
                     placeholder="Search by artist name"
-                    onChange={(e) => handleArtistChange(e.target.value)}
+                    onChange={handleArtistInputChange}
                   />
                   <div
                     style={{
@@ -255,11 +259,11 @@ function App() {
                     <label htmlFor="artist" className="artist-label">
                       Artist prefix (optional)
                     </label>
-                    {artistsSuggestionLoading && <Spinner />}
+                    {artistState.suggestionLoading && <Spinner />}
                   </div>
-                  {artistsSuggestion.length > 0 && (
+                  {artistState.suggestions.length > 0 && (
                     <ul className="suggestion-list">
-                      {artistsSuggestion.map((artist) => (
+                      {artistState.suggestions.map((artist) => (
                         <li
                           key={artist.id}
                           className="suggestion-item"
@@ -348,9 +352,9 @@ function App() {
                 <>
                   <p className="summary-text">
                     You want to add <span>{lines.length}</span> songs{' '}
-                    {selectedArtist ? (
+                    {artistState.selected?.name ? (
                       <>
-                        by <span>{selectedArtist}</span>{' '}
+                        by <span>{artistState.selected?.name}</span>{' '}
                       </>
                     ) : (
                       ''

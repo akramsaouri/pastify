@@ -69,8 +69,8 @@ export const addTracksToPlaylist = (playlistID, uris) => {
 }
 
 export const bulkSearch = async (lines, selectedArtist) => {
-  if (selectedArtist) {
-    lines = lines.map((line) => line + ' ' + selectedArtist)
+  if (selectedArtist?.name) {
+    lines = lines.map((line) => line + ' ' + selectedArtist.name)
   }
   const url = (q) => `https://api.spotify.com/v1/search?q=${q}&type=track`
   const searchLine = async (line) => {
