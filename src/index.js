@@ -23,10 +23,6 @@ function App() {
     artistReducer,
     artistInitialState
   )
-  const [playlistState, playlistDispatch] = useReducer(
-    playlistReducer,
-    playlistInitialState
-  )
   const [loggedIn, setLoggedIn] = useState(false)
   const [value, setValue] = useState('')
   const [lines, setLines] = useState([])
