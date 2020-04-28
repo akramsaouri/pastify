@@ -68,7 +68,10 @@ export const addTracksToPlaylist = (playlistID, uris) => {
   }).then(toJson)
 }
 
-export const bulkSearch = async (lines) => {
+export const bulkSearch = async (lines, selectedArtist) => {
+  if (selectedArtist) {
+    lines = lines.map((line) => line + ' ' + selectedArtist)
+  }
   const url = (q) => `https://api.spotify.com/v1/search?q=${q}&type=track`
   const searchLine = async (line) => {
     const {
@@ -85,6 +88,17 @@ export const bulkSearch = async (lines) => {
     return null
   }
   return Promise.all(lines.map(searchLine))
+}
+
+export const searchArtists = async (q) => {
+  const url = `https://api.spotify.com/v1/search?q=${q}&type=artist&limit=10`
+  const {
+    artists: { items },
+  } = await fetch(url, { headers: headers() }).then(toJson)
+  return items.map((artist) => ({
+    id: artist.id,
+    name: artist.name,
+  }))
 }
 
 export const fetchPlaylistTracks = async (playlistID) => {
