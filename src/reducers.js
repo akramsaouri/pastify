@@ -62,3 +62,25 @@ export function appReducer(state, action) {
       )
   }
 }
+
+export const playlistInitialState = {
+  list: [],
+  fetching: false,
+  selected: null,
+  formVisible: false,
+  input: '',
+}
+
+export function playlistReducer(state, action) {
+  switch (action.type) {
+    case 'setPlaylistPayload':
+      return {
+        ...state,
+        ...action.payload,
+      }
+    default:
+      throw new Error(
+        `Invalid action.type: "${action.type}" was provided to playlistReducer.`
+      )
+  }
+}

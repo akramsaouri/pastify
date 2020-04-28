@@ -10,6 +10,7 @@ import {
   artistReducer,
   appInitialState,
   appReducer,
+  playlistInitialState,
 } from './reducers'
 import './styles.css'
 import Illustration from './icons/Illustration'
@@ -29,11 +30,10 @@ function App() {
   const [value, setValue] = useState('')
   const [lines, setLines] = useState([])
 
-  const [fetching, setFetching] = useState(false)
-  const [playlists, setPlaylists] = useState([])
-  const [selectedPlaylist, setSelectedPlaylist] = useState({})
-  const [showForm, setShowForm] = useState(false)
-  const [name, setName] = useState('')
+  const [playlistState, setPlaylistState] = useReducer(
+    (state, payload) => ({ ...state, ...payload }),
+    playlistInitialState
+  )
 
   const [removeDups, setRemoveDups] = useState(true)
 
@@ -53,8 +53,10 @@ function App() {
   }
 
   const onPlaylistSelect = (playlist) => {
-    setSelectedPlaylist(playlist)
-    setShowForm(false)
+    setPlaylistState({
+      selected: playlist,
+      formVisible: false,
+    })
   }
 
   const handleArtistSelect = (artist) => {
@@ -83,10 +85,10 @@ function App() {
     try {
       const tracks = await Spotify.bulkSearch(lines, artistState.selected)
       let uris = tracks.filter((x) => x !== null).map((t) => t.uri)
-      if (removeDups && selectedPlaylist.id !== 'new') {
+      if (removeDups && playlistState.selected.id !== 'new') {
         // remove duplicate tracks
         const playlistTracks = await Spotify.fetchPlaylistTracks(
-          selectedPlaylist.id
+          playlistState.selected.id
         )
         uris = uris.filter((uri) => !playlistTracks.includes(uri))
       }
@@ -96,34 +98,34 @@ function App() {
           status: 'error',
         })
       }
-      if (selectedPlaylist.id === 'new') {
+      if (playlistState.selected.id === 'new') {
         const newPlaylistID = await Spotify.createPlaylist(
-          selectedPlaylist.name,
+          playlistState.selected.name,
           usernameRef.current
         )
         await Spotify.addTracksToPlaylist(newPlaylistID, uris)
       } else {
-        await Spotify.addTracksToPlaylist(selectedPlaylist.id, uris)
+        await Spotify.addTracksToPlaylist(playlistState.selected.id, uris)
       }
       // reset UI
       setLines(false)
-      setSelectedPlaylist({})
       setValue('')
-      setName('')
-      setShowForm(false)
       dispatchArtist({ type: 'reset' })
       setAppState({
         message: (
           <>
             <span>{uris.length}</span> tracks (out of{' '}
             <span>{tracks.length}</span> lines) were added to{' '}
-            <span>"{selectedPlaylist.name}"</span>.
+            <span>"{playlistState.selected.name}"</span>.
           </>
         ),
         status: 'success',
       })
       // refresh playlists count
-      setPlaylists(await Spotify.fetchPlaylists(usernameRef.current))
+      const playlists = await Spotify.fetchPlaylists(usernameRef.current)
+      setPlaylistState({
+        list: playlists,
+      })
     } catch (e) {
       console.log(e)
       setAppState({
@@ -141,7 +143,7 @@ function App() {
         const username = await Spotify.fetchUsername()
         usernameRef.current = username
         const playlists = await Spotify.fetchPlaylists(username)
-        setPlaylists(playlists)
+        setPlaylistState({ list: playlists })
       } catch (e) {
         console.log(e)
         if (e.message === 'TOKEN_EXPIRED') {
@@ -152,32 +154,39 @@ function App() {
   }
 
   useEffect(() => {
-    setFetching(true)
+    setPlaylistState({ fetching: true })
     fetchPlaylists()
-      .then(() => setFetching(false))
+      .then(() => setPlaylistState({ fetching: false }))
       .catch((e) => console.log(e))
   }, [])
 
   useEffect(() => {
     // scroll to summary effect
-    if (selectedPlaylist.id && lines.length > 0 && summaryDivRef.current) {
+    if (
+      playlistState.selected?.id &&
+      lines.length > 0 &&
+      summaryDivRef.current
+    ) {
       summaryDivRef.current.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [selectedPlaylist.id, lines.length])
+  }, [playlistState.selected?.id, lines.length])
 
   const messageProps = useTransition(appState, null, {
     from: { position: 'absolute', opacity: 0 },
     enter: { opacity: 1 },
-    leave: { opacity: 0 },
+    leave: { opacity: 0 }, // TODO
   })
 
-  const transitions = useTransition(playlists, (playlist) => playlist.id, {
-    from: { transform: 'translate3d(80px,0,0)' },
-    enter: { transform: 'translate3d(0,0px,0)' },
-    leave: { transform: 'translate3d(80px,0,0)' },
-  })
+  const transitions = useTransition(
+    playlistState.list,
+    (playlist) => playlist.id,
+    {
+      from: { transform: 'translate3d(80px,0,0)' },
+      enter: { transform: 'translate3d(0,0px,0)' },
+      leave: { transform: 'translate3d(80px,0,0)' },
+    }
+  )
 
-  console.log({ appState })
   return (
     <>
       <div className="wrapper">
@@ -273,7 +282,7 @@ function App() {
               </div>
             </div>
             <div className="playlists">
-              {fetching ? (
+              {playlistState.fetching ? (
                 <h3 className="subtitle">
                   Fetching your <span>public</span> playlists...
                 </h3>
@@ -282,23 +291,23 @@ function App() {
                   Pick a playlist or{' '}
                   <span
                     style={{ cursor: 'pointer' }}
-                    onClick={() => setShowForm(!showForm)}
+                    onClick={() => setPlaylistState({ formVisible: true })}
                   >
                     create
                   </span>{' '}
                   a new one
                 </h3>
               )}
-              {showForm && (
+              {playlistState.formVisible && (
                 <input
-                  value={name}
+                  value={playlistState.input}
                   onChange={(e) => {
                     const name = e.target.value
-                    setName(name)
+                    setPlaylistState({ input: name })
                     if (!!name) {
-                      setSelectedPlaylist({ id: 'new', name })
+                      setPlaylistState({ selected: { id: 'new', name } })
                     } else {
-                      setSelectedPlaylist({})
+                      setPlaylistState({ selected: {} })
                     }
                   }}
                   required
@@ -307,13 +316,13 @@ function App() {
                   autoFocus
                 />
               )}
-              {fetching ? (
+              {playlistState.fetching ? (
                 <Spinner />
               ) : (
                 <div className="playlists-wrapper">
                   {transitions.map(({ item: playlist, props, key }) => {
                     let classes = 'playlist'
-                    if (selectedPlaylist.id === playlist.id) {
+                    if (playlistState.selected?.id === playlist.id) {
                       classes += ' playlist--selected'
                     }
                     return (
@@ -343,7 +352,7 @@ function App() {
           </div>
           <div className="wrapper">
             <div className="summary-wrapper" ref={summaryDivRef}>
-              {lines.length > 0 && selectedPlaylist.id && (
+              {lines.length > 0 && playlistState.selected.id && (
                 <>
                   <p className="summary-text">
                     You want to add <span>{lines.length}</span> songs{' '}
@@ -354,7 +363,7 @@ function App() {
                     ) : (
                       ''
                     )}
-                    to the playlist <span>{selectedPlaylist.name}</span> ?
+                    to the playlist <span>{playlistState.selected.name}</span> ?
                   </p>
                   <button
                     className="button"
