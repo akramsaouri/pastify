@@ -11,6 +11,8 @@ import {
   appInitialState,
   appReducer,
   playlistInitialState,
+  defaultReducer,
+  formInitialState,
 } from './reducers'
 import './styles.css'
 import Illustration from './icons/Illustration'
@@ -26,33 +28,92 @@ function App() {
   )
   const [appState, dispatchApp] = useReducer(appReducer, appInitialState)
   const setAppState = (payload) => dispatchApp({ type: 'setAppState', payload })
-
-  const [value, setValue] = useState('')
-  const [lines, setLines] = useState([])
-
   const [playlistState, setPlaylistState] = useReducer(
-    (state, payload) => ({ ...state, ...payload }),
+    defaultReducer,
     playlistInitialState
   )
-
+  const [formState, setFormState] = useReducer(defaultReducer, formInitialState)
   const [removeDups, setRemoveDups] = useState(true)
-
   const [debouncedArtistInput] = useDebounce(artistState.input, 300)
   const summaryDivRef = useRef(null)
   const usernameRef = useRef(null)
 
-  const onSpotifySuccess = ({ access_token }) => {
+  useEffect(() => {
+    // fire searchArtists fn on debounced event
+    if (!debouncedArtistInput) return
+    if (artistState.selected?.name === debouncedArtistInput) return
+    dispatchArtist({ type: 'searchArtistStart' })
+    Spotify.searchArtists(debouncedArtistInput).then((artists) => {
+      dispatchArtist({ type: 'searchArtistEnd', payload: artists })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedArtistInput])
+
+  useEffect(() => {
+    // scroll to summary effect
+    if (
+      playlistState.selected?.id &&
+      formState.lines.length > 0 &&
+      summaryDivRef.current
+    ) {
+      summaryDivRef.current.scrollIntoView({ behavior: 'smooth' })
+      if (['success', 'error'].includes(appState.status)) {
+        // recover from last submit result
+        setAppState({
+          status: 'ready',
+          message: null,
+          skip: true,
+        })
+      }
+    }
+  }, [playlistState.selected?.id, formState.value])
+
+  useEffect(() => {
+    async function fetchPlaylists() {
+      try {
+        if (!usernameRef.current) {
+          usernameRef.current = await Spotify.fetchUsername()
+        }
+        return Spotify.fetchPlaylists(usernameRef.current)
+      } catch (e) {
+        console.log(e)
+        if (e.message === 'TOKEN_EXPIRED') {
+          setAppState({ status: 'loggedOut' })
+        }
+      }
+    }
+    const allowedStatus = ['ready', 'success']
+    if (!allowedStatus.includes(appState.status)) return
+    if (appState.skip) return
+    // refresh playlists state on every one of these phases:
+    // - on mount (if token still valid/exists)
+    // - on post submit
+    // - on successfull login
+    const token = localStorage.getItem(Spotify.key)
+    if (token) {
+      setPlaylistState({ fetching: true })
+      fetchPlaylists().then((playlists) => {
+        setPlaylistState({ list: playlists, fetching: false })
+      })
+    } else {
+      setAppState({ status: 'loggedOut' })
+    }
+  }, [appState.status])
+
+  const handleLoginSuccess = ({ access_token }) => {
     localStorage.setItem(Spotify.key, access_token)
-    setAppState({ status: 'idle' })
-    fetchPlaylists()
+    setAppState({ status: 'ready' })
   }
 
-  const onTextAreaChange = ({ target: { value } }) => {
-    setValue(value)
-    setLines(!!value ? value.split('\n').filter((x) => !!x) : [])
+  const handleTextAreaChange = ({ target: { value } }) => {
+    const lines = !!value ? value.split('\n').filter((x) => !!x) : []
+    setFormState({
+      value,
+      lines,
+    })
   }
 
-  const onPlaylistSelect = (playlist) => {
+  const handlePlaylistSelect = (playlist) => {
     setPlaylistState({
       selected: playlist,
       formVisible: false,
@@ -66,26 +127,31 @@ function App() {
     })
   }
 
+  const handlePlaylistInputChange = ({ target: { value } }) => {
+    const newState = {
+      input: value,
+    }
+    if (!!value) {
+      newState.selected = { id: 'new', name: value }
+    } else {
+      newState.selected = {}
+    }
+    setPlaylistState({ ...newState })
+  }
+
   const handleArtistInputChange = ({ target: { value } }) => {
     dispatchArtist({ type: 'changeArtistInput', payload: value })
   }
 
-  useEffect(() => {
-    if (!debouncedArtistInput) return
-    if (artistState.selected?.name === debouncedArtistInput) return
-    dispatchArtist({ type: 'searchArtistStart' })
-    Spotify.searchArtists(debouncedArtistInput).then((artists) => {
-      dispatchArtist({ type: 'searchArtistEnd', payload: artists })
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedArtistInput])
-
   const handleSubmit = async () => {
     setAppState({ status: 'submitting' })
     try {
-      const tracks = await Spotify.bulkSearch(lines, artistState.selected)
+      const tracks = await Spotify.bulkSearch(
+        formState.lines,
+        artistState.selected
+      )
       let uris = tracks.filter((x) => x !== null).map((t) => t.uri)
-      if (removeDups && playlistState.selected.id !== 'new') {
+      if (removeDups) {
         // remove duplicate tracks
         const playlistTracks = await Spotify.fetchPlaylistTracks(
           playlistState.selected.id
@@ -108,9 +174,12 @@ function App() {
         await Spotify.addTracksToPlaylist(playlistState.selected.id, uris)
       }
       // reset UI
-      setLines(false)
-      setValue('')
       dispatchArtist({ type: 'reset' })
+      setFormState({
+        lines: [],
+        value: '',
+      })
+      setPlaylistState({ ...playlistInitialState, list: playlistState.list })
       setAppState({
         message: (
           <>
@@ -121,11 +190,6 @@ function App() {
         ),
         status: 'success',
       })
-      // refresh playlists count
-      const playlists = await Spotify.fetchPlaylists(usernameRef.current)
-      setPlaylistState({
-        list: playlists,
-      })
     } catch (e) {
       console.log(e)
       setAppState({
@@ -135,51 +199,15 @@ function App() {
     }
   }
 
-  async function fetchPlaylists() {
-    const token = localStorage.getItem(Spotify.key)
-    if (token) {
-      setAppState({ status: 'idle' })
-      try {
-        const username = await Spotify.fetchUsername()
-        usernameRef.current = username
-        const playlists = await Spotify.fetchPlaylists(username)
-        setPlaylistState({ list: playlists })
-      } catch (e) {
-        console.log(e)
-        if (e.message === 'TOKEN_EXPIRED') {
-          setAppState({ status: 'loggedOut' })
-        }
-      }
-    }
-  }
-
-  useEffect(() => {
-    setPlaylistState({ fetching: true })
-    fetchPlaylists()
-      .then(() => setPlaylistState({ fetching: false }))
-      .catch((e) => console.log(e))
-  }, [])
-
-  useEffect(() => {
-    // scroll to summary effect
-    if (
-      playlistState.selected?.id &&
-      lines.length > 0 &&
-      summaryDivRef.current
-    ) {
-      summaryDivRef.current.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [playlistState.selected?.id, lines.length])
-
   const messageProps = useTransition(appState, null, {
     from: { position: 'absolute', opacity: 0 },
     enter: { opacity: 1 },
-    leave: { opacity: 0 }, // TODO
+    leave: { opacity: 0 }, // TODO: make this work again
   })
 
   const transitions = useTransition(
     playlistState.list,
-    (playlist) => playlist.id,
+    (playlist) => playlist?.id,
     {
       from: { transform: 'translate3d(80px,0,0)' },
       enter: { transform: 'translate3d(0,0px,0)' },
@@ -187,6 +215,7 @@ function App() {
     }
   )
 
+  console.log('current status: ', appState.status)
   return (
     <>
       <div className="wrapper">
@@ -202,7 +231,7 @@ function App() {
               clientId={process.env.REACT_APP_SPOTIFY_CLIENT_ID}
               redirectUri={process.env.REACT_APP_SPOTIFY_REDIRECT_URI}
               scope="playlist-modify-public"
-              onSuccess={onSpotifySuccess}
+              onSuccess={handleLoginSuccess}
               onFailure={console.log} // TODO: handle this
               className="button"
             />
@@ -220,12 +249,14 @@ function App() {
               <textarea
                 rows={15}
                 placeholder={`Example: \n\nJID - GENERAL\nBAS - DOPAMINE\nTRAVIS SCOTT - 90210\nEARL SWEATSHIRT - GRIEF\nBABY KEEM - HONEST\nEARTHGANG - MEDITATE\nKENDRICK LAMAR - MONEY TREES\nKANYE WEST - LATE\nPUSHA T - NOSETALGIA\nJACK BOYS - WHAT TO DO`}
-                value={value}
+                value={formState.value}
                 style={{
                   borderColor:
-                    lines.length > 0 ? 'var(--button-bg)' : 'var(--gray-color)',
+                    formState.lines.length > 0
+                      ? 'var(--button-bg)'
+                      : 'var(--gray-color)',
                 }}
-                onChange={onTextAreaChange}
+                onChange={handleTextAreaChange}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <label
@@ -239,6 +270,7 @@ function App() {
                     type="checkbox"
                     checked={removeDups}
                     onChange={(e) => setRemoveDups(e.target.checked)}
+                    // TODO:disable this on form visible
                   />
                   <div>
                     <Check checked={removeDups} />
@@ -301,15 +333,7 @@ function App() {
               {playlistState.formVisible && (
                 <input
                   value={playlistState.input}
-                  onChange={(e) => {
-                    const name = e.target.value
-                    setPlaylistState({ input: name })
-                    if (!!name) {
-                      setPlaylistState({ selected: { id: 'new', name } })
-                    } else {
-                      setPlaylistState({ selected: {} })
-                    }
-                  }}
+                  onChange={handlePlaylistInputChange}
                   required
                   placeholder="Give it a name first"
                   className="input"
@@ -330,7 +354,7 @@ function App() {
                         key={key}
                         className={classes}
                         style={props}
-                        onClick={() => onPlaylistSelect(playlist)}
+                        onClick={() => handlePlaylistSelect(playlist)}
                       >
                         <div className="playlist-img">
                           <img src={playlist.img} alt={playlist.name} />
@@ -352,52 +376,56 @@ function App() {
           </div>
           <div className="wrapper">
             <div className="summary-wrapper" ref={summaryDivRef}>
-              {lines.length > 0 && playlistState.selected.id && (
-                <>
-                  <p className="summary-text">
-                    You want to add <span>{lines.length}</span> songs{' '}
-                    {artistState.selected?.name ? (
-                      <>
-                        by <span>{artistState.selected?.name}</span>{' '}
-                      </>
-                    ) : (
-                      ''
-                    )}
-                    to the playlist <span>{playlistState.selected.name}</span> ?
+              {['ready', 'submitting'].includes(appState.status) &&
+                formState.lines.length > 0 &&
+                playlistState.selected?.id && (
+                  <>
+                    <p className="summary-text">
+                      You want to add <span>{formState.lines.length}</span>{' '}
+                      songs{' '}
+                      {artistState.selected?.name ? (
+                        <>
+                          by <span>{artistState.selected?.name}</span>{' '}
+                        </>
+                      ) : (
+                        ''
+                      )}
+                      to the playlist <span>{playlistState.selected.name}</span>{' '}
+                      ?
+                    </p>
+                    <button
+                      className="button"
+                      disabled={appState.status === 'submitting'}
+                      style={
+                        appState.status === 'submitting'
+                          ? { filter: 'opacity(0.7)' }
+                          : {}
+                      }
+                      onClick={handleSubmit}
+                    >
+                      {appState.status === 'submitting' ? (
+                        <>
+                          <Spinner /> <span>Hold on...</span>
+                        </>
+                      ) : (
+                        'Yes, do your job.'
+                      )}
+                    </button>
+                  </>
+                )}
+              {['success', 'error'].includes(appState.status) &&
+                appState.message && (
+                  <p className="message-text">
+                    {appState.status === 'error' ? <Alert /> : <Info />}
+                    <span
+                      className={
+                        appState.status === 'error' ? 'error-text' : 'info-text'
+                      }
+                    >
+                      {appState.message}
+                    </span>
                   </p>
-                  <button
-                    className="button"
-                    disabled={appState.status === 'submitting'}
-                    style={
-                      appState.status === 'submitting'
-                        ? { filter: 'opacity(0.7)' }
-                        : {}
-                    }
-                    onClick={handleSubmit}
-                  >
-                    {appState.status === 'submitting' ? (
-                      <>
-                        <Spinner /> <span>Hold on...</span>
-                      </>
-                    ) : (
-                      'Yes, do your job.'
-                    )}
-                  </button>
-                </>
-              )}
-              {(appState.status === 'error' ||
-                appState.status === 'success') && (
-                <p className="message-text">
-                  {appState.status === 'error' ? <Alert /> : <Info />}
-                  <span
-                    className={
-                      appState.status === 'error' ? 'error-text' : 'info-text'
-                    }
-                  >
-                    {appState.message}
-                  </span>
-                </p>
-              )}
+                )}
             </div>
           </div>
         </>

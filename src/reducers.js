@@ -1,3 +1,5 @@
+// the initial states serve as a sort of a schema also for now
+
 export const artistInitialState = {
   suggestions: [],
   input: '',
@@ -41,16 +43,18 @@ export function artistReducer(state, action) {
 }
 
 export const appInitialState = {
-  status: 'idle',
+  status: 'ready',
+  message: null,
+  skip: false,
 }
 
-export function appReducer(state, action) {
-  const allowedStatus = ['loggedOut', 'idle', 'submitting', 'success', 'error']
+export function appReducer(_, action) {
+  const allowedStatus = ['loggedOut', 'ready', 'submitting', 'success', 'error']
   switch (action.type) {
     case 'setAppState':
-      const { status, message } = action.payload
+      const { status } = action.payload
       if (allowedStatus.includes(status)) {
-        return { status, message }
+        return { ...appInitialState, status, ...action.payload }
       } else {
         throw new Error(
           `Invalid status: "${status}" was provided to setAppState.`
@@ -71,16 +75,11 @@ export const playlistInitialState = {
   input: '',
 }
 
-export function playlistReducer(state, action) {
-  switch (action.type) {
-    case 'setPlaylistPayload':
-      return {
-        ...state,
-        ...action.payload,
-      }
-    default:
-      throw new Error(
-        `Invalid action.type: "${action.type}" was provided to playlistReducer.`
-      )
-  }
+export const formInitialState = {
+  lines: [],
+  value: '',
+}
+
+export function defaultReducer(state, payload) {
+  return { ...state, ...payload }
 }
