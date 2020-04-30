@@ -15,11 +15,7 @@ import {
   formInitialState,
 } from './reducers'
 import './styles.css'
-import Illustration from './icons/Illustration'
-import Spinner from './icons/Spinner'
-import Check from './icons/Check'
-import Info from './icons/Info'
-import Alert from './icons/Alert'
+import { Alert, Check, Illustration, Info, Spinner } from './icons'
 
 function App() {
   const [artistState, dispatchArtist] = useReducer(
