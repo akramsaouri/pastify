@@ -223,14 +223,20 @@ function App() {
             Just paste your list of tracks below and we will do the rest.
           </p>
           {appState.status === 'loggedOut' && (
-            <SpotifyLogin
-              clientId={process.env.REACT_APP_SPOTIFY_CLIENT_ID}
-              redirectUri={process.env.REACT_APP_SPOTIFY_REDIRECT_URI}
-              scope="playlist-modify-public"
-              onSuccess={handleLoginSuccess}
-              onFailure={console.log} // TODO: handle this
-              className="button"
-            />
+            <>
+              <SpotifyLogin
+                clientId={process.env.REACT_APP_SPOTIFY_CLIENT_ID}
+                redirectUri={process.env.REACT_APP_SPOTIFY_REDIRECT_URI}
+                scope="playlist-modify-public"
+                onSuccess={handleLoginSuccess}
+                onFailure={(e) => {
+                  console.log(e)
+                  setAppState({ status: 'loggedOut', message: e.message })
+                }}
+                className="button"
+              />
+              <p className='error-text'>{appState.message}</p>
+            </>
           )}
         </div>
         <div className="right">
@@ -266,7 +272,6 @@ function App() {
                     type="checkbox"
                     checked={removeDups}
                     onChange={(e) => setRemoveDups(e.target.checked)}
-                    // TODO:disable this on form visible
                   />
                   <div>
                     <Check checked={removeDups} />
