@@ -1,5 +1,3 @@
 # pastify
 
-## TODO
-
-- Add footer
+Quickest way to create spotify playlists.
