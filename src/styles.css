@@ -41,6 +41,12 @@ body {
   padding-bottom: 4rem;
 }
 
+input,
+button,
+textarea {
+  font: inherit;
+}
+
 h1,
 h3,
 ul,

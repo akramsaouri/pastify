@@ -211,7 +211,6 @@ function App() {
     }
   )
 
-  console.log('current status: ', appState.status)
   return (
     <>
       <div className="wrapper">
@@ -235,7 +234,7 @@ function App() {
                 }}
                 className="button"
               />
-              <p className='error-text'>{appState.message}</p>
+              <p className="error-text">{appState.message}</p>
             </>
           )}
         </div>
@@ -346,6 +345,7 @@ function App() {
               ) : (
                 <div className="playlists-wrapper">
                   {transitions.map(({ item: playlist, props, key }) => {
+                    if (!playlist) return
                     let classes = 'playlist'
                     if (playlistState.selected?.id === playlist.id) {
                       classes += ' playlist--selected'
