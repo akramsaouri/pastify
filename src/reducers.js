@@ -83,3 +83,7 @@ export const formInitialState = {
 export function defaultReducer(state, payload) {
   return { ...state, ...payload }
 }
+
+export function inStatus(currentStatus, allStatus) {
+  return allStatus.includes(currentStatus)
+}

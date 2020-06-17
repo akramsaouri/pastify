@@ -13,6 +13,7 @@ import {
   playlistInitialState,
   defaultReducer,
   formInitialState,
+  inStatus,
 } from './reducers'
 import './styles.css'
 import { Alert, Check, Illustration, Info, Spinner } from './icons'
@@ -53,7 +54,7 @@ function App() {
       summaryDivRef.current
     ) {
       summaryDivRef.current.scrollIntoView({ behavior: 'smooth' })
-      if (['success', 'error'].includes(appState.status)) {
+      if (inStatus(appState.status, ['success', 'error'])) {
         // recover from last submit result
         setAppState({
           status: 'ready',
@@ -195,11 +196,16 @@ function App() {
     }
   }
 
-  const messageProps = useTransition(appState, null, {
+  const messageProps = useTransition(appState.message, null, {
     from: { position: 'absolute', opacity: 0 },
     enter: { opacity: 1 },
-    leave: { opacity: 0 }, // TODO: make this work again
+    leave: { opacity: 0 },
   })
+
+  const shouldShowProps =
+    inStatus(appState.status, ['ready', 'submitting']) &&
+    formState.lines.length > 0 &&
+    playlistState.selected?.id
 
   const transitions = useTransition(
     playlistState.list,
@@ -377,56 +383,61 @@ function App() {
           </div>
           <div className="wrapper">
             <div className="summary-wrapper" ref={summaryDivRef}>
-              {['ready', 'submitting'].includes(appState.status) &&
-                formState.lines.length > 0 &&
-                playlistState.selected?.id && (
-                  <>
-                    <p className="summary-text">
-                      You want to add <span>{formState.lines.length}</span>{' '}
-                      songs{' '}
-                      {artistState.selected?.name ? (
-                        <>
-                          by <span>{artistState.selected?.name}</span>{' '}
-                        </>
-                      ) : (
-                        ''
-                      )}
-                      to the playlist <span>{playlistState.selected.name}</span>{' '}
-                      ?
-                    </p>
-                    <button
-                      className="button"
-                      disabled={appState.status === 'submitting'}
-                      style={
-                        appState.status === 'submitting'
-                          ? { filter: 'opacity(0.7)' }
-                          : {}
-                      }
-                      onClick={handleSubmit}
-                    >
-                      {appState.status === 'submitting' ? (
-                        <>
-                          <Spinner /> <span>Hold on...</span>
-                        </>
-                      ) : (
-                        'Yes, do your job.'
-                      )}
-                    </button>
-                  </>
-                )}
-              {['success', 'error'].includes(appState.status) &&
-                appState.message && (
-                  <p className="message-text">
-                    {appState.status === 'error' ? <Alert /> : <Info />}
-                    <span
-                      className={
-                        appState.status === 'error' ? 'error-text' : 'info-text'
-                      }
-                    >
-                      {appState.message}
-                    </span>
+              {shouldShowProps && (
+                <>
+                  <p className="summary-text">
+                    You want to add <span>{formState.lines.length}</span> songs{' '}
+                    {artistState.selected?.name ? (
+                      <>
+                        by <span>{artistState.selected?.name}</span>{' '}
+                      </>
+                    ) : (
+                      ''
+                    )}
+                    to the playlist <span>{playlistState.selected.name}</span> ?
                   </p>
-                )}
+                  <button
+                    className="button"
+                    disabled={appState.status === 'submitting'}
+                    style={
+                      appState.status === 'submitting'
+                        ? { filter: 'opacity(0.7)' }
+                        : {}
+                    }
+                    onClick={handleSubmit}
+                  >
+                    {appState.status === 'submitting' ? (
+                      <>
+                        <Spinner /> <span>Hold on...</span>
+                      </>
+                    ) : (
+                      'Yes, do your job.'
+                    )}
+                  </button>
+                </>
+              )}
+              {messageProps.map(
+                ({ item, key, props }) =>
+                  item &&
+                  inStatus(appState.status, ['success', 'error']) && (
+                    <animated.p
+                      key={key}
+                      style={props}
+                      className="message-text"
+                    >
+                      {appState.status === 'error' ? <Alert /> : <Info />}
+                      <span
+                        className={
+                          appState.status === 'error'
+                            ? 'error-text'
+                            : 'info-text'
+                        }
+                      >
+                        {appState.message}
+                      </span>
+                    </animated.p>
+                  )
+              )}
             </div>
           </div>
         </>
