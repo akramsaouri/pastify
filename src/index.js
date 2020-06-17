@@ -218,231 +218,255 @@ function App() {
   )
 
   return (
-    <>
-      <div className="wrapper">
-        <div className="left">
-          <h1 className="title">
-            <span>Pastify:</span> quick way to create playlists.
-          </h1>
-          <p className="description">
-            Just paste your list of tracks below and we will do the rest.
-          </p>
-          {appState.status === 'loggedOut' && (
-            <>
-              <SpotifyLogin
-                clientId={process.env.REACT_APP_SPOTIFY_CLIENT_ID}
-                redirectUri={process.env.REACT_APP_SPOTIFY_REDIRECT_URI}
-                scope="playlist-modify-public"
-                onSuccess={handleLoginSuccess}
-                onFailure={(e) => {
-                  console.log(e)
-                  setAppState({ status: 'loggedOut', message: e.message })
-                }}
-                className="button"
-              />
-              <p className="error-text">{appState.message}</p>
-            </>
-          )}
-        </div>
-        <div className="right">
-          <Illustration />
-        </div>
-      </div>
-      {appState.status !== 'loggedOut' && (
-        <>
-          <div className="wrapper">
-            <div className="textarea">
-              <h3 className="subtitle">Paste tracks here</h3>
-              <textarea
-                rows={15}
-                placeholder={`Example: \n\nJID - GENERAL\nBAS - DOPAMINE\nTRAVIS SCOTT - 90210\nEARL SWEATSHIRT - GRIEF\nBABY KEEM - HONEST\nEARTHGANG - MEDITATE\nKENDRICK LAMAR - MONEY TREES\nKANYE WEST - LATE\nPUSHA T - NOSETALGIA\nJACK BOYS - WHAT TO DO`}
-                value={formState.value}
-                style={{
-                  borderColor:
-                    formState.lines.length > 0
-                      ? 'var(--button-bg)'
-                      : 'var(--gray-color)',
-                }}
-                onChange={handleTextAreaChange}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <label
-                  htmlFor="checkbox"
-                  className="checkbox"
-                  style={{ flex: 1 }}
+    <div className="container">
+      <main>
+        <section className="wrapper">
+          <div className="left">
+            <h1 className="title">
+              <span>Pastify:</span> quick way to create playlists.
+            </h1>
+            <p className="description">
+              Just paste your list of tracks below and we will do the rest.
+            </p>
+            {appState.status === 'loggedOut' && (
+              <>
+                <SpotifyLogin
+                  clientId={process.env.REACT_APP_SPOTIFY_CLIENT_ID}
+                  redirectUri={process.env.REACT_APP_SPOTIFY_REDIRECT_URI}
+                  scope="playlist-modify-public"
+                  onSuccess={handleLoginSuccess}
+                  onFailure={(e) => {
+                    console.log(e)
+                    setAppState({ status: 'loggedOut', message: e.message })
+                  }}
+                  className="button"
+                />
+                <p className="error-text">{appState.message}</p>
+              </>
+            )}
+          </div>
+          <div className="right">
+            <Illustration />
+          </div>
+        </section>
+        {appState.status !== 'loggedOut' && (
+          <>
+            <section className="wrapper">
+              <div className="textarea">
+                <h3 className="subtitle">Paste tracks here</h3>
+                <textarea
+                  rows={15}
+                  placeholder={`Example: \n\nJID - GENERAL\nBAS - DOPAMINE\nTRAVIS SCOTT - 90210\nEARL SWEATSHIRT - GRIEF\nBABY KEEM - HONEST\nEARTHGANG - MEDITATE\nKENDRICK LAMAR - MONEY TREES\nKANYE WEST - LATE\nPUSHA T - NOSETALGIA\nJACK BOYS - WHAT TO DO`}
+                  value={formState.value}
+                  style={{
+                    borderColor:
+                      formState.lines.length > 0
+                        ? 'var(--button-bg)'
+                        : 'var(--gray-color)',
+                  }}
+                  onChange={handleTextAreaChange}
+                />
+                <div
+                  style={{ display: 'flex', justifyContent: 'space-between' }}
                 >
-                  <input
-                    style={{ display: 'none' }}
-                    id="checkbox"
-                    type="checkbox"
-                    checked={removeDups}
-                    onChange={(e) => setRemoveDups(e.target.checked)}
-                  />
-                  <div>
-                    <Check checked={removeDups} />
-                    <span>Remove duplicates</span>
-                  </div>
-                </label>
-                <div style={{ flex: 1 }}>
-                  <input
-                    value={artistState.input}
-                    id="artist"
-                    className="input artist-input"
-                    placeholder="Search by artist name"
-                    onChange={handleArtistInputChange}
-                  />
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
+                  <label
+                    htmlFor="checkbox"
+                    className="checkbox"
+                    style={{ flex: 1 }}
                   >
-                    <label htmlFor="artist" className="artist-label">
-                      Artist prefix (optional)
-                    </label>
-                    {artistState.suggestionLoading && <Spinner />}
+                    <input
+                      style={{ display: 'none' }}
+                      id="checkbox"
+                      type="checkbox"
+                      checked={removeDups}
+                      onChange={(e) => setRemoveDups(e.target.checked)}
+                    />
+                    <div>
+                      <Check checked={removeDups} />
+                      <span>Remove duplicates</span>
+                    </div>
+                  </label>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      value={artistState.input}
+                      id="artist"
+                      className="input artist-input"
+                      placeholder="Search by artist name"
+                      onChange={handleArtistInputChange}
+                    />
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <label htmlFor="artist" className="artist-label">
+                        Artist prefix (optional)
+                      </label>
+                      {artistState.suggestionLoading && <Spinner />}
+                    </div>
+                    {artistState.suggestions.length > 0 && (
+                      <ul className="suggestion-list">
+                        {artistState.suggestions.map((artist) => (
+                          <li
+                            key={artist.id}
+                            className="suggestion-item"
+                            onClick={() => handleArtistSelect(artist)}
+                          >
+                            {artist.name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
-                  {artistState.suggestions.length > 0 && (
-                    <ul className="suggestion-list">
-                      {artistState.suggestions.map((artist) => (
-                        <li
-                          key={artist.id}
-                          className="suggestion-item"
-                          onClick={() => handleArtistSelect(artist)}
-                        >
-                          {artist.name}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
                 </div>
               </div>
-            </div>
-            <div className="playlists">
-              {playlistState.fetching ? (
-                <h3 className="subtitle">
-                  Fetching your <span>public</span> playlists...
-                </h3>
-              ) : (
-                <h3 className="subtitle">
-                  Pick a playlist or{' '}
-                  <span
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setPlaylistState({ formVisible: true })}
-                  >
-                    create
-                  </span>{' '}
-                  a new one
-                </h3>
-              )}
-              {playlistState.formVisible && (
-                <input
-                  value={playlistState.input}
-                  onChange={handlePlaylistInputChange}
-                  required
-                  placeholder="Give it a name first"
-                  className="input"
-                  autoFocus
-                />
-              )}
-              {playlistState.fetching ? (
-                <Spinner />
-              ) : (
-                <div className="playlists-wrapper">
-                  {transitions.map(({ item: playlist, props, key }) => {
-                    if (!playlist) return
-                    let classes = 'playlist'
-                    if (playlistState.selected?.id === playlist.id) {
-                      classes += ' playlist--selected'
-                    }
-                    return (
-                      <animated.div
-                        key={key}
-                        className={classes}
-                        style={props}
-                        onClick={() => handlePlaylistSelect(playlist)}
-                      >
-                        <div className="playlist-img">
-                          <img src={playlist.img} alt={playlist.name} />
-                        </div>
-                        <div className="playlist-details">
-                          <span className="playlist-title">
-                            {playlist.name}
-                          </span>
-                          <span className="playlist-total">
-                            <span>{playlist.total}</span> tracks currently
-                          </span>
-                        </div>
-                      </animated.div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="wrapper">
-            <div className="summary-wrapper" ref={summaryDivRef}>
-              {shouldShowProps && (
-                <>
-                  <p className="summary-text">
-                    You want to add <span>{formState.lines.length}</span> songs{' '}
-                    {artistState.selected?.name ? (
-                      <>
-                        by <span>{artistState.selected?.name}</span>{' '}
-                      </>
-                    ) : (
-                      ''
-                    )}
-                    to the playlist <span>{playlistState.selected.name}</span> ?
-                  </p>
-                  <button
-                    className="button"
-                    disabled={appState.status === 'submitting'}
-                    style={
-                      appState.status === 'submitting'
-                        ? { filter: 'opacity(0.7)' }
-                        : {}
-                    }
-                    onClick={handleSubmit}
-                  >
-                    {appState.status === 'submitting' ? (
-                      <>
-                        <Spinner /> <span>Hold on...</span>
-                      </>
-                    ) : (
-                      'Yes, do your job.'
-                    )}
-                  </button>
-                </>
-              )}
-              {messageProps.map(
-                ({ item, key, props }) =>
-                  item &&
-                  inStatus(appState.status, ['success', 'error']) && (
-                    <animated.p
-                      key={key}
-                      style={props}
-                      className="message-text"
+              <div className="playlists">
+                {playlistState.fetching ? (
+                  <h3 className="subtitle">
+                    Fetching your <span>public</span> playlists...
+                  </h3>
+                ) : (
+                  <h3 className="subtitle">
+                    Pick a playlist or{' '}
+                    <span
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setPlaylistState({ formVisible: true })}
                     >
-                      {appState.status === 'error' ? <Alert /> : <Info />}
-                      <span
-                        className={
-                          appState.status === 'error'
-                            ? 'error-text'
-                            : 'info-text'
-                        }
+                      create
+                    </span>{' '}
+                    a new one
+                  </h3>
+                )}
+                {playlistState.formVisible && (
+                  <input
+                    value={playlistState.input}
+                    onChange={handlePlaylistInputChange}
+                    required
+                    placeholder="Give it a name first"
+                    className="input"
+                    autoFocus
+                  />
+                )}
+                {playlistState.fetching ? (
+                  <Spinner />
+                ) : (
+                  <div className="playlists-wrapper">
+                    {transitions.map(({ item: playlist, props, key }) => {
+                      if (!playlist) return
+                      let classes = 'playlist'
+                      if (playlistState.selected?.id === playlist.id) {
+                        classes += ' playlist--selected'
+                      }
+                      return (
+                        <animated.div
+                          key={key}
+                          className={classes}
+                          style={props}
+                          onClick={() => handlePlaylistSelect(playlist)}
+                        >
+                          <div className="playlist-img">
+                            <img src={playlist.img} alt={playlist.name} />
+                          </div>
+                          <div className="playlist-details">
+                            <span className="playlist-title">
+                              {playlist.name}
+                            </span>
+                            <span className="playlist-total">
+                              <span>{playlist.total}</span> tracks currently
+                            </span>
+                          </div>
+                        </animated.div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </section>
+            <section className="wrapper">
+              <div className="summary-wrapper" ref={summaryDivRef}>
+                {shouldShowProps && (
+                  <>
+                    <p className="summary-text">
+                      You want to add <span>{formState.lines.length}</span>{' '}
+                      songs{' '}
+                      {artistState.selected?.name ? (
+                        <>
+                          by <span>{artistState.selected?.name}</span>{' '}
+                        </>
+                      ) : (
+                        ''
+                      )}
+                      to the playlist <span>{playlistState.selected.name}</span>{' '}
+                      ?
+                    </p>
+                    <button
+                      className="button"
+                      disabled={appState.status === 'submitting'}
+                      style={
+                        appState.status === 'submitting'
+                          ? { filter: 'opacity(0.7)' }
+                          : {}
+                      }
+                      onClick={handleSubmit}
+                    >
+                      {appState.status === 'submitting' ? (
+                        <>
+                          <Spinner /> <span>Hold on...</span>
+                        </>
+                      ) : (
+                        'Yes, do your job.'
+                      )}
+                    </button>
+                  </>
+                )}
+                {messageProps.map(
+                  ({ item, key, props }) =>
+                    item &&
+                    inStatus(appState.status, ['success', 'error']) && (
+                      <animated.p
+                        key={key}
+                        style={props}
+                        className="message-text"
                       >
-                        {appState.message}
-                      </span>
-                    </animated.p>
-                  )
-              )}
-            </div>
-          </div>
-        </>
-      )}
-    </>
+                        {appState.status === 'error' ? <Alert /> : <Info />}
+                        <span
+                          className={
+                            appState.status === 'error'
+                              ? 'error-text'
+                              : 'info-text'
+                          }
+                        >
+                          {appState.message}
+                        </span>
+                      </animated.p>
+                    )
+                )}
+              </div>
+            </section>
+          </>
+        )}
+      </main>
+      <footer>
+        Made by{' '}
+        <a
+          href="https://twitter.com/AkramSaouri"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          @me
+        </a>
+        , issues and code{' '}
+        <a
+          href="https://github.com/akramsaouri/pastify"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          on github
+        </a>
+      </footer>
+    </div>
   )
 }
 
