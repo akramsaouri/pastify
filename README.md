@@ -1,5 +1,3 @@
 # pastify
 
-## TODO
-- Improve removeDups logic
-- Add footer
+Quickest way to create spotify playlists.
