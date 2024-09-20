@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect, useReducer } from 'react'
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useReducer,
+  useCallback,
+} from 'react'
 import ReactDOM from 'react-dom'
 import SpotifyLogin from 'react-spotify-login'
 import { useTransition, animated } from 'react-spring'
@@ -24,7 +30,10 @@ function App() {
     artistInitialState
   )
   const [appState, dispatchApp] = useReducer(appReducer, appInitialState)
-  const setAppState = (payload) => dispatchApp({ type: 'setAppState', payload })
+  const setAppState = useCallback(
+    (payload) => dispatchApp({ type: 'setAppState', payload }),
+    [dispatchApp]
+  )
   const [playlistState, setPlaylistState] = useReducer(
     defaultReducer,
     playlistInitialState
@@ -43,8 +52,7 @@ function App() {
     Spotify.searchArtists(debouncedArtistInput).then((artists) => {
       dispatchArtist({ type: 'searchArtistEnd', payload: artists })
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedArtistInput])
+  }, [debouncedArtistInput, dispatchArtist, artistState.selected])
 
   useEffect(() => {
     // scroll to summary effect
@@ -63,7 +71,12 @@ function App() {
         })
       }
     }
-  }, [playlistState.selected?.id, formState.value])
+  }, [
+    playlistState.selected,
+    formState.lines.length,
+    appState.status,
+    setAppState,
+  ])
 
   useEffect(() => {
     async function fetchPlaylists() {
@@ -95,7 +108,7 @@ function App() {
     } else {
       setAppState({ status: 'loggedOut' })
     }
-  }, [appState.status])
+  }, [appState.status, appState.skip, setAppState, setPlaylistState])
 
   const handleLoginSuccess = ({ access_token }) => {
     localStorage.setItem(Spotify.key, access_token)
@@ -354,7 +367,7 @@ function App() {
                 ) : (
                   <div className="playlists-wrapper">
                     {transitions.map(({ item: playlist, props, key }) => {
-                      if (!playlist) return
+                      if (!playlist) return null
                       let classes = 'playlist'
                       if (playlistState.selected?.id === playlist.id) {
                         classes += ' playlist--selected'
